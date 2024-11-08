@@ -1,0 +1,10 @@
+__pycache__/
+build/
+dist/
+.pytest_cache/
+.pdm-build/
+docs/build/
+.venv/
+.idea/
+.pdm-python
+src/cassandra_asyncio/version.py
