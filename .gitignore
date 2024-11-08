@@ -7,4 +7,4 @@ docs/build/
 .venv/
 .idea/
 .pdm-python
-src/cassandra_asyncio/version.py
+cassandra_asyncio/version.py

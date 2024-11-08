@@ -20,7 +20,6 @@ jobs:
           pdm sync
       - name: Build package
         run: |
-          git status
           pdm build
       - name: Upload package
         uses: actions/upload-artifact@v4
