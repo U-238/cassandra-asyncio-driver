@@ -11,13 +11,11 @@ $ pip install cassandra-asyncio-driver
 ## Usage
 
 To adapt existing code to use the asyncio driver, replace:
-
 ```python
 from cassandra.cluster import Cluster
 ```
 
 with:
-
 ```python
 from cassandra_asyncio.cluster import Cluster
 ```
@@ -29,7 +27,6 @@ For synchronous queries, `session.execute()` can still be used as normal.
 All other Cassandra classes should continue to be imported from the usual paths.
 
 For example:
-
 ```python
 import csv
 import asyncio
