@@ -11,7 +11,7 @@ from cassandra import InvalidRequest
 
 
 def _get_session():
-    auth_provider = PlainTextAuthProvider(username='root', password='cassandra')
+    auth_provider = PlainTextAuthProvider(username='cassandra', password='cassandra')
     cluster = Cluster(auth_provider=auth_provider)
     session = cluster.connect('lists')
     session.row_factory = dict_factory
@@ -98,7 +98,6 @@ async def _test_prepared_select():
 
     prepared = session.prepare('SELECT genre, name, rating, seen FROM movies_to_watch')
     rows = await session.aexecute(prepared)
-    #rows = session.execute(prepared)
     for row in rows:
         writer.writerow(row)
 
