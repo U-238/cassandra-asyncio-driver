@@ -32,7 +32,7 @@ class _ResponseBridge:
         _handle_error(exc, self.future)
 
     async def wait(self):
-        return await asyncio.shield(asyncio.wrap_future(self.future))
+        return await _await_uncancelled(asyncio.wrap_future(self.future))
 
 
 def _next_row(iterator):
@@ -45,6 +45,16 @@ def _next_row(iterator):
 def _consume_task_exception(task):
     if not task.cancelled():
         task.exception()
+
+
+async def _await_uncancelled(awaitable):
+    """Leave submitted work running and consume errors after caller cancellation."""
+    task = asyncio.ensure_future(awaitable)
+    task.add_done_callback(_consume_task_exception)
+    # wait() does not cancel its input when this caller is cancelled. Unlike
+    # shield() on Python 3.14, it does not log intentionally detached failures.
+    await asyncio.wait({task})
+    return task.result()
 
 
 class AsyncResultSet(ResultSet):
@@ -75,8 +85,7 @@ class AsyncResultSet(ResultSet):
                         self._next_task = asyncio.create_task(
                             asyncio.to_thread(_next_row, self._async_rows)
                         )
-                        self._next_task.add_done_callback(_consume_task_exception)
-                    available, row = await asyncio.shield(self._next_task)
+                    available, row = await _await_uncancelled(self._next_task)
                     self._next_task = None
                 else:
                     available, row = _next_row(self._async_rows)
@@ -172,10 +181,8 @@ async def _aexecute_concurrent(
             for result in results
         ]
 
-    # Shield submission as well as the future: queries outlive cancelled awaits.
-    task = asyncio.create_task(execute())
-    task.add_done_callback(_consume_task_exception)
-    return await asyncio.shield(task)
+    # Protect submission as well as the future: queries outlive cancelled awaits.
+    return await _await_uncancelled(execute())
 
 
 class Cluster(DriverCluster):
