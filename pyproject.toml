@@ -6,9 +6,9 @@ authors = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "cassandra-driver>=3.29.2"
+    "cassandra-driver>=3.30.1,<4"
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 
@@ -27,3 +27,24 @@ build-backend = "pdm.backend"
 
 [dependency-groups]
 test = ["pytest>=7.4.3"]
+lint = ["ruff>=0.14,<1"]
+
+[tool.pdm.scripts]
+lint = {composite = ["ruff check .", "ruff format --check ."]}
+format = {composite = ["ruff check --fix .", "ruff format ."]}
+test = "pytest"
+test-graph-integration = "pytest --run-integration tests/test_graph_integration.py"
+test-integration = "pytest --run-integration tests/test_cassandra_asyncio.py"
+check = {composite = ["lint", "test"]}
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+extend-exclude = ["cassandra_asyncio/version.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires a local Cassandra server and the lists keyspace"]

@@ -1,28 +1,85 @@
 name: Publish to PyPI
 
-on: push
+on: [push, pull_request]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  checks:
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
     - uses: actions/checkout@v4
     - name: Set up PDM
       uses: pdm-project/setup-pdm@v4
       with:
-        python-version: "3.x"
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: pdm sync --clean -G test -G lint
+    - name: Lint and test
+      run: pdm run check
+
+  build:
+    needs: [checks, integration]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Set up PDM
+      uses: pdm-project/setup-pdm@v4
+      with:
+        python-version: "3.14"
     - name: Install dependencies
       run: |
-        pdm sync
+        pdm sync --prod
     - name: Build package
       run: |
         pdm build
+    - name: Validate wheel in a clean environment
+      run: |
+        python -m venv /tmp/wheel-smoke
+        /tmp/wheel-smoke/bin/python -m pip install dist/*.whl
+        cd /tmp
+        /tmp/wheel-smoke/bin/python -c 'from cassandra_asyncio import __version__; from cassandra_asyncio.cluster import Cluster, AsyncResultSet; print(__version__)'
     - name: Upload package
       uses: actions/upload-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      cassandra:
+        image: cassandra:5.0.9
+        ports:
+        - 9042:9042
+        env:
+          MAX_HEAP_SIZE: 1G
+          HEAP_NEWSIZE: 256M
+        options: >-
+          --health-cmd "cqlsh -e 'SELECT release_version FROM system.local;'"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 30
+          --health-start-period 60s
+    steps:
+    - uses: actions/checkout@v4
+    - uses: pdm-project/setup-pdm@v4
+      with:
+        python-version: "3.14"
+    - run: pdm sync -G test
+    - name: Create test keyspace
+      run: >-
+        docker exec ${{ job.services.cassandra.id }} cqlsh -e
+        "CREATE KEYSPACE IF NOT EXISTS lists WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};"
+    - run: pdm run test-integration
 
   publish-to-pypi:
     if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre')
